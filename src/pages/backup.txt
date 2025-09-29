@@ -1,0 +1,260 @@
+import React, { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import api from '../api/api.js';
+import { useParams } from 'react-router-dom';
+import ReactPaginate from 'react-paginate';
+
+const WholesaleBuyerDetailsPage = () => {
+    const { id } = useParams();
+    const [buyer, setBuyer] = useState(null);
+    const [transactions, setTransactions] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    
+    // State for pagination
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+
+    // State for the sales form
+    const [wholesaleProducts, setWholesaleProducts] = useState([]);
+    const [saleItems, setSaleItems] = useState([]);
+    // MODIFIED: State now holds pricePerKg instead of a total price
+    const [newItem, setNewItem] = useState({ name: '', quantity: '1', weight: '', pricePerKg: '' });
+    const [formError, setFormError] = useState('');
+    const [isCashPayment, setIsCashPayment] = useState(false);
+
+    const fetchDetails = async () => {
+        setIsLoading(true);
+        try {
+            const [buyerRes, transRes, productsRes] = await Promise.all([
+                api.get(`/wholesale-buyers/${id}`),
+                api.get(`/transactions/wholesale-buyer/${id}?page=${page}`),
+                api.get('/wholesale-products')
+            ]);
+            setBuyer(buyerRes.data);
+            setTransactions(transRes.data.transactions);
+            setTotalPages(transRes.data.totalPages);
+            setWholesaleProducts(productsRes.data);
+            setError(null);
+        } catch (err) {
+            setError('Failed to fetch details.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchDetails();
+    }, [id, page]);
+
+    // --- NEW: Real-time calculation for the current item ---
+    const newItemTotalPrice = (parseFloat(newItem.weight) || 0) * (parseFloat(newItem.pricePerKg) || 0);
+
+    const handleNewItemChange = (e) => {
+        setNewItem({ ...newItem, [e.target.name]: e.target.value });
+    };
+
+    const handleAddItemToSale = () => {
+        if (!newItem.name || !newItem.quantity || !newItem.weight || !newItem.pricePerKg) {
+            setFormError('All fields are required for each item.');
+            return;
+        }
+        // MODIFIED: Add the calculated total price to the item before adding it to the cart
+        const itemToAdd = {
+            ...newItem,
+            totalPrice: newItemTotalPrice
+        };
+        setSaleItems([...saleItems, itemToAdd]);
+        setNewItem({ name: '', quantity: '1', weight: '', pricePerKg: '' }); // Reset form
+        setFormError('');
+    };
+
+    const handleRemoveItemFromSale = (itemIndexToRemove) => {
+        setSaleItems(saleItems.filter((_, index) => index !== itemIndexToRemove));
+    };
+    
+    const handleSubmitSale = async () => {
+    if (saleItems.length === 0) {
+        setFormError('You must add at least one item to the sale.');
+        return;
+    }
+    const payload = {
+        wholesaleBuyerId: id,
+        items: saleItems.map(item => ({
+            name: item.name,
+            quantity: Number(item.quantity) || 0,
+            weight: Number(item.weight) || 0,
+            price: item.totalPrice
+        })),
+        isCashPayment: isCashPayment, // <-- NEW: Send payment status
+    };
+    try {
+        await api.post('/sales/wholesale', payload);
+        toast.success('Wholesale sale created successfully!'); // Using toast instead of alert
+        setSaleItems([]);
+        fetchDetails(); // Refresh all page data
+    } catch (err) {
+        toast.error(err.response?.data?.message || 'Failed to complete sale.'); // Using toast
+    }
+};
+
+    const handleViewReceipt = (transaction) => {
+        let receiptData = {};
+        const buyerName = buyer ? buyer.name : 'N/A';
+
+        if (transaction.type === 'WHOLESALE_SALE') {
+            receiptData = {
+                type: 'wholesale_sale', // A new, specific type
+                customerName: buyerName,
+                items: transaction.customItems,
+                totalAmount: transaction.amount,
+                balanceBefore: transaction.balanceBefore,
+                balanceAfter: transaction.balanceAfter,
+                date: transaction.createdAt,
+            };
+        } else if (['DEPOSIT', 'WITHDRAWAL'].includes(transaction.type)) {
+            receiptData = {
+                type: 'deposit',
+                customerName: buyerName,
+                depositAmount: transaction.amount,
+                balanceBefore: transaction.balanceBefore,
+                balanceAfter: transaction.balanceAfter,
+                date: transaction.createdAt,
+            };
+        } else {
+            return;
+        }
+
+        sessionStorage.setItem('receiptData', JSON.stringify(receiptData));
+        window.open('/receipt', '_blank');
+    };
+
+    // MODIFIED: The final total is now a sum of each item's calculated total price
+    const saleTotal = saleItems.reduce((acc, item) => acc + item.totalPrice, 0);
+
+    if (isLoading) return <p>Loading details...</p>;
+    if (error) return <p style={{ color: 'red' }}>{error}</p>;
+    if (!buyer) return <p>Buyer not found.</p>;
+
+    return (
+        <div>
+            <div className="page-header"><h1>{buyer.name}</h1></div>
+            
+            {/* Buyer Information Card */}
+            <div style={{ background: 'white', padding: '20px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '30px' }}>
+                <h3>Buyer Information</h3>
+                <p><strong>Business Name:</strong> {buyer.businessName || 'N/A'}</p>
+                <p><strong>Phone:</strong> {buyer.phone}</p>
+                <p><strong>Current Balance:</strong> TK {buyer.balance.toFixed(2)}</p>
+            </div>
+
+            {/* Make a Wholesale Sale Form */}
+            <div style={{ background: 'white', padding: '20px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '30px' }}>
+                <h3>Make a Wholesale Sale 🛒</h3>
+                {/* This first div now only contains the inputs */}
+            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 1fr', gap: '10px' }}>
+                <select name="name" value={newItem.name} onChange={handleNewItemChange}>
+                    <option value="" disabled>-- Select a Product --</option>
+                    {wholesaleProducts.map(product => (
+                        <option key={product._id} value={product.name}>{product.name}</option>
+                    ))}
+                </select>
+                <input type="number" name="quantity" placeholder="Quantity" value={newItem.quantity} onChange={handleNewItemChange} />
+                <input type="number" name="weight" placeholder="Weight (kg)" value={newItem.weight} onChange={handleNewItemChange} />
+                <input type="number" name="pricePerKg" placeholder="Price/kg (TK)" value={newItem.pricePerKg} onChange={handleNewItemChange} />
+            </div>
+
+            {/* This new div contains the total and the button on their own line */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '15px' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '1.2em', marginRight: '20px' }}>
+                    Total: {newItemTotalPrice.toFixed(2)}
+                </div>
+                <button onClick={handleAddItemToSale} className="button-primary">Add Item</button>
+            </div>
+
+                {saleItems.length > 0 && (
+                    <div style={{marginTop: '20px'}}>
+                        <h4>Items to Sell</h4>
+                        <table>
+                            <thead>
+                            <tr><th>Name</th><th>Qty</th><th>Weight</th><th>Price/kg</th><th>Total Price</th><th>Remove</th></tr>
+                        </thead>
+                            <tbody>
+                                {saleItems.map((item, index) => (
+                                    <tr key={index}>
+                                        <td>{item.name}</td>
+                                        <td>{item.quantity}</td>
+                                        <td>{item.weight} kg</td>
+                                        <td>TK {item.pricePerKg}</td>
+                                        <td>TK {item.totalPrice.toFixed(2)}</td>
+                                        <td>
+                                        <button onClick={() => handleRemoveItemFromSale(index)} className="button-danger" style={{padding: '5px 10px'}}>
+                                            X
+                                        </button>
+                                    </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    <h3 style={{textAlign: 'right', marginTop: '15px'}}>Final Total: TK {saleTotal.toFixed(2)}</h3>                    </div>
+                )}
+
+                {formError && <p style={{ color: 'red', marginTop: '10px' }}>{formError}</p>}
+                <div style={{ marginTop: '15px', fontSize: '1.1em' }}>
+            <label>
+                <input 
+                    type="checkbox"
+                    checked={isCashPayment}
+                    onChange={(e) => setIsCashPayment(e.target.checked)}
+                    style={{ marginRight: '10px', transform: 'scale(1.2)' }}
+                />
+                Paid in Cash 💵
+            </label>
+        </div>
+                <button onClick={handleSubmitSale} className="button-success" style={{width: '100%', marginTop: '20px', padding: '12px'}}>Complete Sale</button>
+            </div>
+
+            {/* --- THIS SECTION IS UNCHANGED --- */}
+            <div>
+                <h2>Transaction History</h2>
+                <table>
+                    <thead>
+                        <tr><th>Date</th><th>Type</th><th>Details</th><th>Amount (TK)</th><th>Actions</th></tr>                    </thead>
+                    <tbody>
+                        {transactions.map((t) => (
+                            <tr key={t._id}>
+                                <td>{new Date(t.createdAt).toLocaleString()}</td>
+                                <td>{t.type}</td>
+                                <td>{t.notes}</td>
+                                <td style={{ color: ['SALE', 'WHOLESALE_SALE', 'WITHDRAWAL'].includes(t.type) ? 'red' : 'green' }}>
+                                  {t.amount.toFixed(2)}
+                                </td>
+                                <td>
+                                    {['WHOLESALE_SALE', 'DEPOSIT', 'WITHDRAWAL'].includes(t.type) && (
+                                        <button onClick={() => handleViewReceipt(t)} className="button-primary">
+                                            View Receipt
+                                        </button>
+                                    )}
+                                </td>
+                                                            
+                                </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {totalPages > 1 && (
+                    <ReactPaginate
+                        previousLabel={'< Previous'}
+                        nextLabel={'Next >'}
+                        pageCount={totalPages}
+                        onPageChange={(data) => setPage(data.selected + 1)}
+                        containerClassName={'pagination'}
+                        activeClassName={'active'}
+                        forcePage={page - 1}
+                    />
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default WholesaleBuyerDetailsPage;
