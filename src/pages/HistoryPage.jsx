@@ -29,14 +29,22 @@ const HistoryPage = () => {
   const handleViewReceipt = (transaction) => {
     let receiptData = {};
     if (transaction.type === 'SALE') {
+        const isRandomSale = !transaction.customer;
         receiptData = {
-            type: 'sale', customerName: transaction.customer?.name, items: transaction.items,
-            totalAmount: transaction.amount, balanceBefore: transaction.balanceBefore,
-            balanceAfter: transaction.balanceAfter, date: transaction.createdAt,
+            type: 'sale', 
+            // This is the most important line for this bug fix:
+            customerName: transaction.customer?.name || transaction.randomCustomerName || 'Random Customer', 
+            items: transaction.items,
+            totalAmount: transaction.amount, 
+            balanceBefore: isRandomSale ? null : transaction.balanceBefore,
+            balanceAfter: isRandomSale ? null : transaction.balanceAfter, 
+            date: transaction.createdAt,
+            paymentMethod: transaction.paymentMethod
         };
     } else if (transaction.type === 'DEPOSIT' || transaction.type === 'WITHDRAWAL') {
         receiptData = {
-            type: 'deposit', customerName: transaction.customer?.name || transaction.wholesaleBuyer?.name,
+            type: 'deposit', 
+            customerName: transaction.customer?.name || transaction.wholesaleBuyer?.name, 
             depositAmount: transaction.amount,
             balanceBefore: transaction.balanceBefore, 
             balanceAfter: transaction.balanceAfter,
@@ -55,18 +63,16 @@ const HistoryPage = () => {
             referenceName: transaction.referenceName,
             balanceAfter: transaction.balanceAfter,
         };
-
     } else if (transaction.type === 'WHOLESALE_SALE') {
         receiptData = {
             type: 'wholesale_sale',
-            customerName: transaction.wholesaleBuyer?.name, // Use the populated wholesale buyer name
+            customerName: transaction.wholesaleBuyer?.name,
             items: transaction.customItems,
             totalAmount: transaction.amount,
             balanceBefore: transaction.balanceBefore,
             balanceAfter: transaction.balanceAfter,
             date: transaction.createdAt,
-        };    
-        
+        };
     } else { 
         return; 
     }
@@ -74,7 +80,12 @@ const HistoryPage = () => {
     window.open('/receipt', '_blank');
   };
 
-  const renderDetail = (t) => t.notes;
+  const renderDetail = (t) => {
+    if (t.type === 'SALE' && !t.customer) {
+        return `Cash sale to ${t.randomCustomerName || 'a random customer'}`;
+    }
+    return t.notes;
+  };
 
   if (isLoading && transactions.length === 0) return <p>Loading history...</p>;
   if (error) return <p style={{ color: 'red' }}>{error}</p>;

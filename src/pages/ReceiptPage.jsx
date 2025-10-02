@@ -106,8 +106,12 @@ const ReceiptPage = () => {
         <hr style={hrStyle} />
         <p style={{ textAlign: 'right', fontSize: '1.2em' }}><strong>TOTAL: TK {receiptData.totalAmount.toFixed(2)}</strong></p>
         <hr style={hrStyle} />
+        {receiptData.balanceBefore != null && receiptData.balanceAfter != null && (
+        <>
         <p><strong>Previous Balance:</strong> TK {receiptData.balanceBefore.toFixed(2)}</p>
         <p><strong>New Balance:</strong> TK {receiptData.balanceAfter.toFixed(2)}</p>
+        </>
+        )}
         <div style={{ marginTop: '30px', paddingTop: '50px', borderTop: '1px dashed #333', textAlign: 'right' }}>
         <p style={{ margin: '0' }}>_________________________</p>
         <p style={{ margin: '5px 0 0 0' }}>Authorized Signature</p>

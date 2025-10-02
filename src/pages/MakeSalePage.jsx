@@ -14,9 +14,14 @@ const MakeSalePage = () => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [isRandomCustomer, setIsRandomCustomer] = useState(false);
   const [isCashPayment, setIsCashPayment] = useState(false);
-
-  // --- Your useEffect and handleAddItem functions also remain the same ---
+  const [randomCustomerName, setRandomCustomerName] = useState('');
+  useEffect(() => {
+    if (isRandomCustomer) {
+      setIsCashPayment(true);
+    }
+  }, [isRandomCustomer]);
   
  const loadCustomers = async (inputValue) => {
     const response = await api.get(`/customers?search=${inputValue}`);
@@ -52,48 +57,61 @@ const MakeSalePage = () => {
     setQuantity(1);
     setError(null);
 };
+
+  const handleRemoveItem = (itemIndexToRemove) => {
+      setSaleItems(prevItems => prevItems.filter((_, index) => index !== itemIndexToRemove));
+    };
   const totalAmount = saleItems.reduce((total, item) => total + (item.price * item.quantity), 0);
 
   
+  // Replace the entire existing handleSubmitSale function with this one
+
   const handleSubmitSale = async () => {
-    if (!selectedCustomerId || saleItems.length === 0) {
-        setError('Please select a customer and add at least one item.');
-        return;
+    if (!isRandomCustomer && !selectedCustomerId) {
+      setError('Please select a customer or mark as a random customer sale.');
+      return;
+    }
+    if (saleItems.length === 0) {
+      setError('Please add at least one item.');
+      return;
     }
 
     const saleData = {
-        customerId: selectedCustomerId.value, // Make sure to use .value if it's an object
-        items: saleItems.map(item => ({
-            productId: item._id,
-            quantity: item.quantity,
-        })),
-        isCashPayment: isCashPayment, // <-- NEW: Send payment status
+      isRandomCustomer: isRandomCustomer,
+      isCashPayment: isCashPayment,
+      items: saleItems.map(item => ({ productId: item._id, quantity: item.quantity })),
+      randomCustomerName: randomCustomerName,
     };
 
-    try {
-        const customer = selectedCustomerId; // The full customer object from react-select
-        const response = await api.post('/sales', saleData);
 
-        // NEW: Updated receipt logic
-        const receiptData = {
-            type: 'sale',
-            customerName: customer.name,
-            items: saleItems,
-            totalAmount: response.data.totalAmount,
-            balanceBefore: customer.balance,
-            // If it's cash, the balance after is the same as before
-            balanceAfter: isCashPayment ? customer.balance : customer.balance - response.data.totalAmount,
-            paymentMethod: isCashPayment ? 'Cash' : 'Credit', // Add to receipt
-            date: response.data.createdAt,
-        };
-
-        sessionStorage.setItem('receiptData', JSON.stringify(receiptData));
-        window.open('/receipt', '_blank');
-        navigate('/');
-    } catch (err) {
-        setError(err.response?.data?.error || 'Failed to complete sale.');
+    if (!isRandomCustomer) {
+      saleData.customerId = selectedCustomerId.value;
     }
-};
+
+    try {
+      const response = await api.post('/sales', saleData);
+      const customerName = isRandomCustomer ? (randomCustomerName || 'Random Customer') : selectedCustomerId.name;      const balanceBefore = isRandomCustomer ? 0 : selectedCustomerId.balance;
+      const balanceAfter = (isRandomCustomer || isCashPayment) ? balanceBefore : balanceBefore - response.data.totalAmount;
+
+
+      const receiptData = {
+        type: 'sale',
+        customerName: customerName,
+        items: saleItems,
+        totalAmount: response.data.totalAmount,
+        balanceBefore: balanceBefore,
+        balanceAfter: balanceAfter,
+        paymentMethod: isCashPayment ? 'Cash' : 'Credit',
+        date: response.data.createdAt,
+      };
+
+      sessionStorage.setItem('receiptData', JSON.stringify(receiptData));
+      window.open('/receipt', '_blank');
+      navigate('/');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to complete sale.');
+    }
+  };
 
   // --- The rest of your return() statement remains the same ---
   if (isLoading) return <p>Loading sale page...</p>;
@@ -105,13 +123,40 @@ const MakeSalePage = () => {
       {/* Customer Selection */}
       <div style={{ marginBottom: '20px' }}>
         <h3>1. Select Customer</h3>
-  <AsyncSelect
-      cacheOptions
-      loadOptions={loadCustomers}
-      defaultOptions
-      onChange={(option) => setSelectedCustomerId(option)}
-      placeholder="Type to search for a customer..."
-  />
+        <div style={{ marginBottom: '10px' }}>
+            <label>
+                <input
+                    type="checkbox"
+                    checked={isRandomCustomer}
+                    onChange={(e) => setIsRandomCustomer(e.target.checked)}
+                    style={{ marginRight: '10px' }}
+                />
+                Sell to Random Customer (Cash Only)
+            </label>
+        </div>
+
+        {isRandomCustomer && (
+          <div style={{ marginBottom: '15px' }}>
+            <label>Random Customer Name (Optional):</label>
+            <input
+              type="text"
+              value={randomCustomerName}
+              onChange={(e) => setRandomCustomerName(e.target.value)}
+              placeholder="Enter name for receipt..."
+              style={{ width: '100%', padding: '10px', boxSizing: 'border-box' }}
+            />
+          </div>
+        )}
+
+        <AsyncSelect
+          cacheOptions
+          loadOptions={loadCustomers}
+          defaultOptions
+          value={selectedCustomerId}
+          onChange={(option) => setSelectedCustomerId(option)}
+          placeholder="Type to search for a registered customer..."
+          isDisabled={isRandomCustomer} // <-- Add this prop
+        />
       </div>
 
       {/* Add Products Section */}
@@ -158,6 +203,11 @@ const MakeSalePage = () => {
                 <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.quantity}</td>
                 <td style={{ padding: '8px', border: '1px solid #ddd' }}>TK{item.price.toFixed(2)}</td>
                 <td style={{ padding: '8px', border: '1px solid #ddd' }}>TK{(item.price * item.quantity).toFixed(2)}</td>
+                <td style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'center' }}>
+                  <button onClick={() => handleRemoveItem(index)} className="button-danger" style={{padding: '5px 10px', lineHeight: '1'}}>
+                    X
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -168,16 +218,17 @@ const MakeSalePage = () => {
       {error && <p style={{ color: 'red', marginTop: '20px' }}>Error: {error}</p>}
       
       <div style={{ marginTop: '20px', fontSize: '1.1em' }}>
-    <label>
-        <input 
+        <label>
+          <input
             type="checkbox"
             checked={isCashPayment}
             onChange={(e) => setIsCashPayment(e.target.checked)}
+            disabled={isRandomCustomer} // <-- Add this prop
             style={{ marginRight: '10px' }}
-        />
-        Paid in Cash 💵
-    </label>
-</div>
+          />
+          Paid in Cash 💵
+        </label>
+      </div>
 
       {/* Finalize Sale Button */}
       <button 

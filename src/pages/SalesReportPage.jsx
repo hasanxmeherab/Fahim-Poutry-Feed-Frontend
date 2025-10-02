@@ -71,7 +71,7 @@ const SalesReportPage = () => {
                             {reportData.sales.map((sale) => (
                                 <tr key={sale._id}>
                                     <td>{new Date(sale.createdAt).toLocaleString()}</td>
-                                    <td>{sale.customer?.name || 'N/A'}</td>
+                                    <td>{sale.customer?.name || sale.randomCustomerName || 'Random Customer'}</td>
                                     <td>{sale.amount.toFixed(2)}</td>
                                     <td>{/* Future: Link to receipt */}</td>
                                 </tr>
