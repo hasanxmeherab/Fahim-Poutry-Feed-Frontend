@@ -30,14 +30,34 @@ const ReceiptPage = () => {
     const printContent = document.getElementById('receipt-container');
     const printWindow = window.open('', '_blank', 'height=800,width=600');
     
-    printWindow.document.write('<html><head><title>Print Receipt</title>');
+    printWindow.document.write('<html><head><title></title>');
     
     // Link to your main CSS file to keep the table and text styling
     printWindow.document.write('<link rel="stylesheet" href="/index.css" type="text/css" />');
     
+
     // Add specific styles for the pop-up window
-    printWindow.document.write('<style> body { padding: 20px; } #print-button, .developed-by-tag, .app-footer { display: none; } #receipt-container { width: 100% !important; margin: 0; padding: 0; box-shadow: none; border: none; } </style>');
-    
+    printWindow.document.write(`
+            <style>
+                @page {
+                    size: auto;
+                    margin: 0mm; /* This removes the browser's default headers and footers */
+                }
+                body { 
+                    padding: 20px; 
+                }
+                #print-button, .developed-by-tag, .app-footer { 
+                    display: none; 
+                }
+                #receipt-container { 
+                    width: 100% !important; 
+                    margin: 0; 
+                    padding: 0; 
+                    box-shadow: none; 
+                    border: none; 
+                }
+            </style>
+        `);    
     printWindow.document.write('</head><body>');
     printWindow.document.write(printContent.innerHTML);
     printWindow.document.write('</body></html>');

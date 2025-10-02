@@ -26,7 +26,7 @@ import AddWholesaleBuyerPage from './pages/AddWholesaleBuyerPage';
 import EditWholesaleBuyerPage from './pages/EditWholesaleBuyerPage';
 import WholesaleBuyerDetailsPage from './pages/WholesaleBuyerDetailsPage';
 import AddWholesaleProductPage from './pages/AddWholesaleProductPage';
-
+import EditWholesaleProductPage from './pages/EditWholesaleProductPage';
 
 // A simple home page component for our root path (Dashboard)
 // The corrected HomePage component
@@ -168,7 +168,8 @@ const AppContent = () => {
                         <Route path="/edit-wholesale-buyer/:id" element={<EditWholesaleBuyerPage />} />
                         <Route path="/wholesale-buyers/:id" element={<WholesaleBuyerDetailsPage />} />
                         <Route path="/add-wholesale-product" element={<AddWholesaleProductPage />} />
-                            
+                        <Route path="/edit-wholesale-product/:id" element={<EditWholesaleProductPage />} />
+
                     </Route>
                 </Routes>
             </main>

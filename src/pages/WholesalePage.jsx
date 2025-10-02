@@ -1,16 +1,17 @@
+// File: Fahim-Poutry-Feed-Frontend/src/pages/WholesalePage.jsx
+
 import React, { useState, useEffect } from 'react';
 import api from '../api/api';
 import { Link } from 'react-router-dom';
 import Modal from 'react-modal';
 
 const WholesalePage = () => {
+  // ... (all existing state and functions remain the same)
   const [buyers, setBuyers] = useState([]);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-
-  // State for modals
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [currentBuyer, setCurrentBuyer] = useState(null);
   const [modalType, setModalType] = useState('');
@@ -34,7 +35,6 @@ const WholesalePage = () => {
       }
   };
 
-  // Debounced search effect
   useEffect(() => {
     const timerId = setTimeout(() => {
         fetchData();
@@ -45,11 +45,25 @@ const WholesalePage = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this buyer?')) {
       await api.delete(`/wholesale-buyers/${id}`);
-      fetchData(); // Refresh list
+      fetchData();
+    }
+  };
+  
+  // --- NEW FUNCTION: To delete a wholesale product ---
+  const handleDeleteProduct = async (productId) => {
+    if (window.confirm('Are you sure you want to delete this product?')) {
+        try {
+            await api.delete(`/wholesale-products/${productId}`);
+            setProducts(products.filter(p => p._id !== productId));
+            alert('Product deleted successfully!');
+        } catch (err) {
+            console.error("Delete failed:", err.response?.data || err.message);
+            alert('Failed to delete product. Check the console for more details.');
+        }
     }
   };
 
-  // Modal Functions
+  // ... (modal functions remain the same)
   const openModal = (buyer, type) => {
     setCurrentBuyer(buyer);
     setModalType(type);
@@ -57,9 +71,7 @@ const WholesalePage = () => {
     setModalError('');
     setAmount('');
   };
-
   const closeModal = () => setModalIsOpen(false);
-
   const handleModalSubmit = async (e) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
@@ -78,15 +90,16 @@ const WholesalePage = () => {
     }
   };
 
+
   if (error) return <p style={{ color: 'red' }}>{error}</p>;
 
   return (
     <div>
+      {/* ... (buyers section remains the same) ... */}
       <div className="page-header">
         <h1>Wholesale Buyers</h1>
         <Link to="/add-wholesale-buyer" className="button-link button-success">+ Add New Buyer</Link>
       </div>
-
       <div style={{ margin: '20px 0' }}>
         <input
           type="text"
@@ -96,9 +109,7 @@ const WholesalePage = () => {
           style={{ width: '100%', padding: '10px' }}
         />
       </div>
-
       {isLoading && buyers.length === 0 && <p>Loading buyers...</p>}
-
       <table style={{ transition: 'opacity 0.3s', opacity: isLoading ? 0.5 : 1 }}>
         <thead>
           <tr>
@@ -133,17 +144,36 @@ const WholesalePage = () => {
         </tbody>
       </table>
       
+      {/* --- MODIFIED PRODUCTS SECTION --- */}
       <div className="page-header" style={{ marginTop: '40px' }}>
         <h1>Wholesale Products</h1>
         <Link to="/add-wholesale-product" className="button-link button-success">+ Add New Product</Link>
       </div>
       <table>
-        <thead><tr><th>Product Name</th></tr></thead>
+        <thead>
+            <tr>
+                <th>Product Name</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
         <tbody>
-          {products.map((product) => ( <tr key={product._id}><td>{product.name}</td></tr> ))}
+          {products.map((product) => (
+            <tr key={product._id}>
+                <td>{product.name}</td>
+                <td>
+                    <Link to={`/edit-wholesale-product/${product._id}`} className="button-link button-info">
+                        Edit
+                    </Link>
+                    <button onClick={() => handleDeleteProduct(product._id)} className="button-danger">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
+      {/* ... (modal component remains the same) ... */}
       <Modal isOpen={modalIsOpen} onRequestClose={closeModal} contentLabel="Transaction Modal" style={{ content: { top: '50%', left: '50%', right: 'auto', bottom: 'auto', transform: 'translate(-50%, -50%)', width: '400px' } }}>
           <h2>{modalType === 'deposit' ? 'Make a Deposit' : 'Make a Withdrawal'} for {currentBuyer?.name}</h2>
           <form onSubmit={handleModalSubmit}>

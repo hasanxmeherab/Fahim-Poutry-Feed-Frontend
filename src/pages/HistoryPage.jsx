@@ -36,8 +36,10 @@ const HistoryPage = () => {
         };
     } else if (transaction.type === 'DEPOSIT' || transaction.type === 'WITHDRAWAL') {
         receiptData = {
-            type: 'deposit', customerName: transaction.customer?.name, depositAmount: transaction.amount,
-            balanceBefore: transaction.balanceBefore, balanceAfter: transaction.balanceAfter,
+            type: 'deposit', customerName: transaction.customer?.name || transaction.wholesaleBuyer?.name,
+            depositAmount: transaction.amount,
+            balanceBefore: transaction.balanceBefore, 
+            balanceAfter: transaction.balanceAfter,
             date: transaction.createdAt,
         };
     } else if (transaction.type === 'BUY_BACK') {
@@ -53,6 +55,18 @@ const HistoryPage = () => {
             referenceName: transaction.referenceName,
             balanceAfter: transaction.balanceAfter,
         };
+
+    } else if (transaction.type === 'WHOLESALE_SALE') {
+        receiptData = {
+            type: 'wholesale_sale',
+            customerName: transaction.wholesaleBuyer?.name, // Use the populated wholesale buyer name
+            items: transaction.customItems,
+            totalAmount: transaction.amount,
+            balanceBefore: transaction.balanceBefore,
+            balanceAfter: transaction.balanceAfter,
+            date: transaction.createdAt,
+        };    
+        
     } else { 
         return; 
     }
@@ -84,7 +98,7 @@ const HistoryPage = () => {
               <td>{t.type}</td>
               <td>{renderDetail(t)}</td>
               <td>
-                {['SALE', 'DEPOSIT', 'WITHDRAWAL', 'BUY_BACK'].includes(t.type) && (
+                {['SALE', 'DEPOSIT', 'WITHDRAWAL', 'BUY_BACK', 'WHOLESALE_SALE'].includes(t.type) && (
                     <button onClick={() => handleViewReceipt(t)} className="button-primary">
                         View Receipt
                     </button>
